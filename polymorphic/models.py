@@ -14,6 +14,7 @@ from .base import PolymorphicModelBase
 from .managers import PolymorphicManager
 from .query_translate import translate_polymorphic_Q_object
 
+
 ###################################################################################
 # PolymorphicModel
 
@@ -74,6 +75,7 @@ class PolymorphicModel(six.with_metaclass(PolymorphicModelBase, models.Model)):
         # (used by PolymorphicQuerySet._get_real_instances)
         if not self.polymorphic_ctype_id:
             self.polymorphic_ctype = ContentType.objects.db_manager(using).get_for_model(self, for_concrete_model=False)
+
     pre_save_polymorphic.alters_data = True
 
     def save(self, *args, **kwargs):
@@ -81,6 +83,7 @@ class PolymorphicModel(six.with_metaclass(PolymorphicModelBase, models.Model)):
         using = kwargs.get('using', self._state.db or DEFAULT_DB_ALIAS)
         self.pre_save_polymorphic(using=using)
         return super(PolymorphicModel, self).save(*args, **kwargs)
+
     save.alters_data = True
 
     def get_real_instance_class(self):
@@ -93,10 +96,10 @@ class PolymorphicModel(six.with_metaclass(PolymorphicModelBase, models.Model)):
         """
         if self.polymorphic_ctype_id is None:
             raise PolymorphicTypeUndefined((
-                "The model {}#{} does not have a `polymorphic_ctype_id` value defined.\n"
-                "If you created models outside polymorphic, e.g. through an import or migration, "
-                "make sure the `polymorphic_ctype_id` field points to the ContentType ID of the model subclass."
-            ).format(self.__class__.__name__, self.pk))
+                                               "The model {}#{} does not have a `polymorphic_ctype_id` value defined.\n"
+                                               "If you created models outside polymorphic, e.g. through an import or migration, "
+                                               "make sure the `polymorphic_ctype_id` field points to the ContentType ID of the model subclass."
+                                           ).format(self.__class__.__name__, self.pk))
 
         # the following line would be the easiest way to do this, but it produces sql queries
         # return self.polymorphic_ctype.model_class()
@@ -125,7 +128,8 @@ class PolymorphicModel(six.with_metaclass(PolymorphicModelBase, models.Model)):
         model_class = self.get_real_instance_class()
         if model_class is None:
             return None
-        return ContentType.objects.db_manager(self._state.db).get_for_model(model_class, for_concrete_model=True).model_class()
+        return ContentType.objects.db_manager(self._state.db).get_for_model(model_class,
+                                                                            for_concrete_model=True).model_class()
 
     def get_real_instance(self):
         """
@@ -145,7 +149,7 @@ class PolymorphicModel(six.with_metaclass(PolymorphicModelBase, models.Model)):
             return self
         return real_model.objects.db_manager(self._state.db).get(pk=self.pk)
 
-    def __init__(self, * args, ** kwargs):
+    def __init__(self, *args, **kwargs):
         """Replace Django's inheritance accessor member functions for our model
         (self.__class__) with our own versions.
         We monkey patch them until a patch can be added to Django
@@ -164,7 +168,7 @@ class PolymorphicModel(six.with_metaclass(PolymorphicModelBase, models.Model)):
         But they should not. So we replace them with our own accessors that use
         our appropriate base_objects manager.
         """
-        super(PolymorphicModel, self).__init__(*args, ** kwargs)
+        super(PolymorphicModel, self).__init__(*args, **kwargs)
 
         if self.__class__.polymorphic_super_sub_accessors_replaced:
             return
@@ -172,8 +176,13 @@ class PolymorphicModel(six.with_metaclass(PolymorphicModelBase, models.Model)):
 
         def create_accessor_function_for_model(model, accessor_name):
             def accessor_function(self):
+                # Maybe select related or something
+                cached = getattr(self, '_%s_cache' % accessor_name, None)
+                if cached:
+                    return cached
                 attr = model._base_objects.get(pk=self.pk)
                 return attr
+
             return accessor_function
 
         subclasses_and_superclasses_accessors = self._get_inheritance_relation_fields_and_models()
@@ -209,7 +218,7 @@ class PolymorphicModel(six.with_metaclass(PolymorphicModelBase, models.Model)):
             for sub_cls in super_cls.__subclasses__():  # go through all subclasses of model
                 if super_cls in sub_cls._meta.parents:  # super_cls may not be in sub_cls._meta.parents if super_cls is a proxy model
                     field_to_super = sub_cls._meta.parents[super_cls]  # get the field that links sub_cls to super_cls
-                    if field_to_super is not None:    # if filed_to_super is not a link to a proxy model
+                    if field_to_super is not None:  # if filed_to_super is not a link to a proxy model
                         super_to_sub_related_field = field_to_super.remote_field
                         if super_to_sub_related_field.related_name is None:
                             # if related name is None the related field is the name of the subclass
